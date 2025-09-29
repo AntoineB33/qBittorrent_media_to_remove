@@ -1,21 +1,21 @@
 import requests
 from datetime import datetime
+import sys
 
-# --- CONFIG ---
-QBIT_URL = "http://localhost:8080"
-USERNAME = "admin"
-PASSWORD = "Cg644`#0UUwL"
+# --- IMPORT CONFIG ---
+try:
+    from config import QBIT_URL, USERNAME, PASSWORD
+except ImportError:
+    print("❌ Could not import config.py. Make sure QBIT_URL, USERNAME, and PASSWORD are defined there.")
+    sys.exit(1)
 
-# List of shows you don't want to include in the removal list (case-insensitive)
-EXCLUDE_LIST = [
-    "Sinners.2025.2160p.WEB-DL.DV.HDR10+.DDP5.1.Atmos.H265.MP4-BEN.THE.MEN",
-    "www.UIndex.org    -    DAN.DA.DAN.S02E01.PROPER.1080p.WEB.H264-KAWAII",
-    "www.UIndex.org    -    DAN DA DAN S02E02 The Evil Eye 1080p CR WEB-DL DUAL DDP2 0 H 264-Kitsune",
-    "The.Bear.S01.2160p.HULU.WEB-DL.DDP5.1.x265-KOGi[rartv]",
-    "No Hard Feelings (2023) [2160p] [4K] [WEB] [5.1] [YTS.MX]",
-    "www.UIndex.org    -    Ne Zha 2 (2025) 2160p 4K WEB 5.1-WORLD"
-    # Add more show names or keywords here
-]
+# --- READ EXCLUSION LIST ---
+try:
+    with open("exclusions.txt", "r", encoding="utf-8") as f:
+        EXCLUDE_LIST = [line.strip().lower() for line in f if line.strip()]
+except FileNotFoundError:
+    print("⚠️ No exclusions.txt file found. No torrents will be excluded.")
+    EXCLUDE_LIST = []
 
 # --- CONNECT TO QBITTORRENT ---
 session = requests.Session()
@@ -33,7 +33,7 @@ ranked = []
 
 for t in torrents:
     # Skip excluded shows
-    if any(keyword.lower() in t["name"].lower() for keyword in EXCLUDE_LIST):
+    if t["name"].lower() in EXCLUDE_LIST:
         continue
 
     size_gb = t["size"] / (1024**3)
@@ -41,10 +41,11 @@ for t in torrents:
     uploaded_gb = t["uploaded"] / (1024**3)
     days_since_completion = (now - completion).days if completion else 0
 
+    # --- SCORE FORMULA ---
     score = (size_gb * 2) + (days_since_completion * 0.5) - (uploaded_gb * 3)
 
     ranked.append({
-        "hash": t["hash"],  # Needed for deletion
+        "hash": t["hash"],
         "name": t["name"],
         "size_gb": round(size_gb, 2),
         "days_since_completion": days_since_completion,
@@ -63,14 +64,14 @@ for idx, r in enumerate(ranked, start=1):
 
 if not ranked:
     print("\n✅ No torrents matched the removal criteria.")
-    exit()
+    sys.exit(0)
 
 # Ask how many to remove
 try:
     to_remove_count = int(input("\nHow many torrents from the top do you want to remove? (Enter 0 to skip): "))
 except ValueError:
     print("Invalid number. Exiting without removing anything.")
-    exit()
+    sys.exit(1)
 
 if to_remove_count > 0:
     to_remove = ranked[:to_remove_count]
