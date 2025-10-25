@@ -1,2 +1,4 @@
 config.py
 exclusions.txt
+requirements.txt
+__pycache__/
