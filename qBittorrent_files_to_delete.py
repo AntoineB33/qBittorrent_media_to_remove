@@ -1,12 +1,47 @@
 import requests
 from datetime import datetime
 import sys
+import subprocess
+import time
+
 
 # --- IMPORT CONFIG ---
 try:
     from config import QBIT_URL, USERNAME, PASSWORD
 except ImportError:
     print("❌ Could not import config.py. Make sure QBIT_URL, USERNAME, and PASSWORD are defined there.")
+    sys.exit(1)
+    
+auto_open = False
+def ensure_qbittorrent_running():
+    global auto_open
+    try:
+        # Test if qBittorrent WebUI is reachable
+        resp = requests.get(f"{QBIT_URL}/api/v2/app/version", timeout=3)
+        if resp.status_code == 200:
+            print("🟢 qBittorrent WebUI is already running.")
+            return True
+    except requests.exceptions.RequestException:
+        print("⚠️ qBittorrent WebUI not reachable. Attempting to start...")
+
+    # Try to start qBittorrent depending on OS
+    try:
+        if sys.platform.startswith("win"):
+            subprocess.Popen([r"C:\Program Files\qBittorrent\qbittorrent.exe", "--no-splash", "--webui-port=8080"])
+        elif sys.platform.startswith("darwin"):
+            subprocess.Popen(["open", "-a", "qBittorrent"])
+        else:  # Linux/Unix
+            subprocess.Popen(["qbittorrent-nox", "--webui-port=8080"])
+        print("⏳ Starting qBittorrent WebUI, please wait...")
+        auto_open = True
+        time.sleep(5)  # give it time to start
+        return True
+    except Exception as e:
+        print(f"❌ Failed to start qBittorrent automatically: {e}")
+        return False
+
+
+if not ensure_qbittorrent_running():
     sys.exit(1)
 
 # --- READ EXCLUSION LIST ---
@@ -95,3 +130,15 @@ if to_remove_count > 0:
         print("\n❌ Deletion cancelled. No torrents were removed.")
 else:
     print("\nNo torrents removed.")
+if auto_open:
+    print("\n🧹 Closing qBittorrent since it was auto-launched...")
+    try:
+        if sys.platform.startswith("win"):
+            subprocess.run(["taskkill", "/IM", "qbittorrent.exe", "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif sys.platform.startswith("darwin"):
+            subprocess.run(["pkill", "-x", "qBittorrent"])
+        else:
+            subprocess.run(["pkill", "-x", "qbittorrent-nox"])
+        print("✅ qBittorrent closed.")
+    except Exception as e:
+        print(f"⚠️ Failed to close qBittorrent automatically: {e}")
