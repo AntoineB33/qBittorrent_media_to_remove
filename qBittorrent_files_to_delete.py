@@ -16,25 +16,26 @@ auto_open = False
 def ensure_qbittorrent_running():
     global auto_open
     try:
-        # Test if qBittorrent WebUI is reachable
         resp = requests.get(f"{QBIT_URL}/api/v2/app/version", timeout=3)
         if resp.status_code == 200:
             print("🟢 qBittorrent WebUI is already running.")
             return True
+        elif resp.status_code == 403:
+            print("🟠 qBittorrent WebUI is running but requires authentication.")
+            return True
     except requests.exceptions.RequestException:
         print("⚠️ qBittorrent WebUI not reachable. Attempting to start...")
 
-    # Try to start qBittorrent depending on OS
     try:
         if sys.platform.startswith("win"):
             subprocess.Popen([r"C:\Program Files\qBittorrent\qbittorrent.exe", "--no-splash", "--webui-port=8080"])
         elif sys.platform.startswith("darwin"):
             subprocess.Popen(["open", "-a", "qBittorrent"])
-        else:  # Linux/Unix
+        else:
             subprocess.Popen(["qbittorrent-nox", "--webui-port=8080"])
         print("⏳ Starting qBittorrent WebUI, please wait...")
         auto_open = True
-        time.sleep(5)  # give it time to start
+        time.sleep(5)
         return True
     except Exception as e:
         print(f"❌ Failed to start qBittorrent automatically: {e}")

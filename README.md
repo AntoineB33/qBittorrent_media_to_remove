@@ -1,0 +1,1 @@
+exclusions.txt for videos you plan to watch
